@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>INT Volume Rendering</title>
+		<meta charset="utf-8">
+		<meta name="author" content="Vincent Dumestre and Nathan Krupa -- INT">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				font-family: Monospace;
+				font-size: 13px;
+				text-align: center;
+				font-weight: bold;
+				background-color: #ffffff;
+				margin: 0px;
+				overflow: hidden;
+			}
+		</style>
+	</head>
+
+	<body>
+		<!-- Imported files (GitHub) -->
+		<script src="./libs/three.min.js"></script>
+		<script src="./libs/Detector.js"></script>
+		<script src="./libs/OrbitControls.js"></script>
+		<script src="./libs/dat.gui.min.js"></script>
+		<script src="./libs/stats.min.js"></script>
+
+		<!-- Our js files -->
+		<script src="./js/ShadersVolumeRendering.js"></script>
+		<script src="./js/INTMeshVolumeRendering.js"></script>
+		<script src="./js/LoadFile.js"></script>
+		<script src="./js/functions.js"></script>
+
+		<!-- Buttons that upload data -->
+		<form action="#" onsubmit="return false;">
+            <input type="file" id="fileinput">
+            <input type="button" id="btnLoad" value="Load" onclick="loadFile();">
+        </form>
+
+		<div id="container">
+			<div>Transfer function</div>
+			0.0<img id="transferFunctionImg" style="align:right"/>1.0
+		</div>
+
+		<script>
+
+			// Check if the browser supports WebGL.
+			if ( ! Detector.webgl ) {
+
+				Detector.addGetWebGLMessage();
+
+			}
+
+			// Define variables.
+			var container, stats;
+			var camera, scene, renderer, meshVolume;
+			var data, color, colorpos;
+			var guiControls;
+			var boxSize = new THREE.Vector3( 400., 201., 400. );
+			var steps = 200;
+			var alphaCorrection = 0.1;
+
+			init();
+			animate();
+
+			/** Initialize the entire scene. */
+			function init() {
+
+				//Parameters that can be modified.
+				guiControls = new function() {
+
+					this.steps = 50;
+					this.alphaCorrection = 0.2;
+					this.color1 = [ 0, 0, 255 ];
+					this.color2 = [ 0, 255, 0 ];
+					this.color3 = [ 255, 0, 0 ];
+					this.alpha1 = 0.0;
+					this.alpha2 = 0.4;
+					this.alpha3 = 0.8;
+					this.pos1 = 0;
+					this.pos2 = 0.7;
+					this.pos3 = 1;
+
+				};
+
+				container = document.getElementById( 'container' );
+
+				// Create camera and set its position in the middle of the object.
+				camera = new THREE.PerspectiveCamera( 40, window.innerWidth / window.innerHeight, 0.01, 3000.0 );
+				camera.position.set( boxSize.x / 2, boxSize.y / 2, boxSize.z * 2 );
+
+				// Show fps monitor.
+				stats = new Stats();
+				stats.showPanel( 0 );  // 0: fps, 1: ms, 2: mb, 3+: custom
+				document.body.appendChild( stats.dom );
+
+				// Create the scene and the renderer.
+				scene = new THREE.Scene();
+				renderer = new THREE.WebGLRenderer();
+				container.appendChild( renderer.domElement );
+
+				// Recover the default colors and its positions defined on guiControls for the transfer function.
+				color = [
+							guiControls.color1.toRGBA( guiControls.alpha1 ),
+					 		guiControls.color2.toRGBA( guiControls.alpha2 ),
+							guiControls.color3.toRGBA( guiControls.alpha3 )
+						];
+				colorpos = [ guiControls.pos1, guiControls.pos2, guiControls.pos3 ];
+
+				// Create the GUI part.
+				var gui = new dat.gui.GUI();
+				gui.remember( guiControls );
+				gui.add( guiControls, 'steps', 10, 400, 10 );
+				gui.add( guiControls, 'alphaCorrection', 0 );
+
+				var step1Folder = gui.addFolder( 'Step 1' );
+				step1Folder.addColor( guiControls, 'color1' );
+				step1Folder.add( guiControls, 'alpha1', 0, 1 );
+				step1Folder.add( guiControls, 'pos1', 0, 1 );
+				step1Folder.open();
+
+				var step2Folder = gui.addFolder( 'Step 2' );
+				step2Folder.addColor( guiControls, 'color2' );
+				step2Folder.add( guiControls, 'alpha2', 0, 1 );
+				step2Folder.add( guiControls, 'pos2', 0, 1 );
+				step2Folder.open();
+
+				var step3Folder = gui.addFolder( 'Step 3' );
+				step3Folder.addColor( guiControls, 'color3' );
+				step3Folder.add( guiControls, 'alpha3', 0, 1 );
+				step3Folder.add( guiControls, 'pos3', 0, 1 );
+				step3Folder.open();
+
+				controls = new THREE.OrbitControls( camera, container );
+
+				// Create the volume rendering with its mesh and add it in the scene.
+				meshVolume = new INTMeshVolumeRendering( renderer,camera,boxSize );
+				meshVolume.updateTransferFunction( color, colorpos );
+				scene.add( meshVolume );
+
+				onWindowResize();
+				window.addEventListener( 'resize', onWindowResize, false );
+
+			}
+
+			/** Define animations done each frame. */
+			function animate() {
+
+				stats.begin();
+
+				// Recover changements of colors.
+				color = [
+							guiControls.color1.toRGBA( guiControls.alpha1 ),
+		 					guiControls.color2.toRGBA( guiControls.alpha2 ),
+							guiControls.color3.toRGBA( guiControls.alpha3 )
+						];
+				colorpos = [ guiControls.pos1, guiControls.pos2, guiControls.pos3 ];
+
+				// Update values.
+				meshVolume.updateTransferFunction( color, colorpos );
+				meshVolume.setSteps( guiControls.steps );
+				meshVolume.setAlphaCorrection( guiControls.alphaCorrection );
+
+				renderer.render( scene, camera );
+				controls.update();
+
+				stats.end();
+
+				requestAnimationFrame( animate );
+
+			}
+
+			/**
+			 * Adapt the display when the window is resized.
+			 * @param {object} event - The event.
+			 */
+			function onWindowResize( event ) {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			}
+
+			/** Load the data from a the file. */
+			function loadFile() {
+
+				/** Compute the percentage of progress and display it in the console browser. */
+				function progress( data ) {
+
+                    if ( data.lengthComputable ) {
+
+                        var progress = parseInt( (data.loaded / data.total) * 100, 10 );
+                        console.log("Progress : "+progress);
+
+                    }
+                }
+
+				/** Convert binary data and add it to meshVolume. */
+                function receivedBinary() {
+
+                    var data = new Float32Array( fr.getResult() );
+					meshVolume.addData( data, 1500, 4482 );
+
+                }
+
+				var fr = new FileLoader();
+				fr.setOnProgress( progress );
+				fr.setOnLoad( receivedBinary );
+				fr.readAsArrayBuffer( document.getElementById( 'fileinput' ) );
+
+            };
+
+		</script>
+
+	</body>
+</html>
