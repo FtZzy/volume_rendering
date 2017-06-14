@@ -19,9 +19,17 @@ Actually you see:
 
 The monitor displays the _fps_ by default. You can have the _ping_, the _allocated memory_ or custom informations if you click on it.
 
+![Monitor screeshots](./img/stats.png)
+
 Next, you have to load a file! Before that please unzip `data.zip` and the file **'velocity'**. With the first button choose _velocity_ in the directory `data` and select 'Load'. Wait a couple of seconds and a cube will appear. You can move the object or zoom with the mouse.
 
+![Load file](./img/load.png)
+
 Finally, we get the Graphical User Interface (GUI). The GUI controller represents the transfer function: you can change number of steps (higher is the number better is the result, but lower are the _fps_), the alpha correction that change the general opacity, the colors, their relative transparency and position. The position allows to display values more than others (the colors are linear between two). You can show or hide the panel with `h`.
+
+![GUI](./img/gui.png)
+![Volume rendering](./img/rendu1.png)
+![Volume rendering](./img/rendu2.png)
 
 
 ## DATA
